@@ -2,9 +2,10 @@ import numpy as np
 from statistics import mean
 from multiprocessing import cpu_count
 from n2 import HnswIndex
+from typing import List
 
 
-def kNN(matrix, k):
+def kNN(matrix: np.ndarray, k: int) -> List[float]:
     index = HnswIndex(matrix.shape[1], 'L2')
     for sample in matrix:
         index.add_data(sample)

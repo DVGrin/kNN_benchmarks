@@ -2,13 +2,12 @@ import re
 import math
 import time
 
+from random import choices
+from typing import Dict, List, Optional, Any
+from multiprocessing import cpu_count
+
 import numpy as np
 import matplotlib.pyplot as plt
-
-from copy import deepcopy
-from random import choices
-from typing import Dict, List, Optional
-from multiprocessing import cpu_count
 
 from gensim.models import Word2Vec
 from nltk.tokenize import TreebankWordTokenizer
@@ -60,7 +59,7 @@ def _vectorize_strings(error_tokens_list: List[List[str]]) -> np.ndarray:
     result = []
     model = Word2Vec(error_tokens_list, size=100, window=5, min_count=1, workers=cpu_count(), iter=10)
     for error in error_tokens_list:
-        sentence_vector = []
+        sentence_vector: List[Any] = []
         token_number = 0
         for token in error:
             if token_number == 0:
@@ -74,11 +73,11 @@ def _vectorize_strings(error_tokens_list: List[List[str]]) -> np.ndarray:
 
 
 def prepare_file(filename: str, sample_size: int) -> np.ndarray:
-    data = _open_file(filename, sample_size)
-    data = _clean_file_contents(data)
-    data = _tokenize_strings(data)
-    data = _vectorize_strings(data)
-    return data
+    strings = _open_file(filename, sample_size)
+    strings = _clean_file_contents(strings)
+    tokens = _tokenize_strings(strings)
+    tokens = _vectorize_strings(tokens)
+    return tokens
 
 
 def benchmark_kNN_methods(matrix: np.ndarray, k: Optional[int]) -> Dict[str, float]:
@@ -112,9 +111,10 @@ def plot_benchmark_results(results: Dict[int, Dict[str, float]], k: Optional[int
     # TODO: Axis names
     plt.figure()
     sample_sizes = list(results.keys())
-    benchmark_times = deepcopy(list(results.values())[0])
-    for method in benchmark_times.keys():
-        benchmark_times[method] = []
+    benchmark_times: Dict[str, List] = dict(zip(
+        list(results.values())[0],
+        (list() for i in range(len(results)))
+    ))
     for method_results in results.values():
         for method, elapsed_time in method_results.items():
             benchmark_times[method].append(elapsed_time)
