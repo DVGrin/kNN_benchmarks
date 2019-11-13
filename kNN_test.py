@@ -142,7 +142,7 @@ def run_benchmarks(filename: str, sample_sizes: List[int], k: Optional[int] = No
 
 
 if __name__ == "__main__":
-    results = run_benchmarks("../datasets/error_logs_test.csv", [1000, 5000, 10000, 40000], k=None)
+    results = run_benchmarks("../datasets/error_logs_test.csv", [1000, 5000, 10000, 20000, 40000], k=None)
     for sample_size, benchmark_times in results.items():
         print(f"{sample_size} samples:")
         for algo_name, algo_time in benchmark_times.items():
