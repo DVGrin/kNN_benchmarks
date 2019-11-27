@@ -3,7 +3,7 @@ import math
 import time
 
 from random import choices
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any
 from multiprocessing import cpu_count
 
 import numpy as np
@@ -80,47 +80,58 @@ def prepare_file(filename: str, sample_size: int) -> np.ndarray:
     return tokens
 
 
-def benchmark_kNN_methods(matrix: np.ndarray, k: Optional[int]) -> Dict[str, float]:
-    # TODO: several runs and standard deviation
+def benchmark_kNN_methods(matrix: np.ndarray, k: Optional[int], n_runs: int) -> Dict[str, Tuple[float, float]]:
     # TODO: compare kNN results to be close
     methods = knn_methods.method_list
     if k is None:
         k = int(math.sqrt(matrix.shape[0]))
 
-    results = {}
+    results: Dict[str, List[float]] = {}
     for name, method in methods.items():
-        start_time = time.perf_counter()
-        distances = method(matrix, k)
-        results[name] = time.perf_counter() - start_time
+        results[name] = []
+        for i in range(n_runs):
+            start_time = time.perf_counter()
+            distances = method(matrix, k)
+            results[name].append(time.perf_counter() - start_time)
         print(f"{name}: {distances[-5:]}")
 
-    return results
+    avg_results: Dict[str, Tuple[float, float]] = {}
+    for name in results:
+        avg_results[name] = (np.mean(results[name]), np.std(results[name]))
+    return avg_results
 
 
-def plot_benchmark_results_bar(benchmark_times: Dict[str, float], sample_size: int, k: Optional[int]) -> None:
-    # TODO: Axis names
+def plot_benchmark_results_bar(benchmark_times: Dict[str, Tuple[float, float]], sample_size: int, k: Optional[int]) -> None:
     if k is None:
         k = int(math.sqrt(sample_size))
     plt.figure()
-    plt.bar(benchmark_times.keys(), benchmark_times.values())
+    means = [value[0] for value in benchmark_times.values()]
+    plt.bar(benchmark_times.keys(), means)
+    plt.ylabel("Execution time")
     plt.suptitle(f"kNN method execution time for {sample_size} samples, {k} neighbours")
     plt.savefig(f"./img/kNN_benchmark_{sample_size}_samples_{k}_neighbours.png")
 
 
-def plot_benchmark_results(results: Dict[int, Dict[str, float]], k: Optional[int]) -> None:
-    # TODO: Axis names
+def plot_benchmark_results(results: Dict[int, Dict[str, Tuple[float, float]]], k: Optional[int]) -> None:
     plt.figure()
     sample_sizes = list(results.keys())
-    benchmark_times: Dict[str, List] = dict(zip(
+    benchmark_times: Dict[str, List[float]] = dict(zip(
+        list(results.values())[0],
+        (list() for i in range(len(results)))
+    ))
+    benchmark_std: Dict[str, List[float]] = dict(zip(
         list(results.values())[0],
         (list() for i in range(len(results)))
     ))
     for method_results in results.values():
         for method, elapsed_time in method_results.items():
-            benchmark_times[method].append(elapsed_time)
+            benchmark_times[method].append(elapsed_time[0])
+            benchmark_std[method].append(elapsed_time[1])
     for method, times in benchmark_times.items():
-        plt.plot(sample_sizes, times, "-o", label=method)
+        plt.errorbar(sample_sizes, times, yerr=benchmark_std[method], fmt="-o", label=method)
 
+    plt.xlabel("Sample size")
+    plt.ylabel("Execution time (s)")
     plt.legend()
     if k is None:
         plt.suptitle(r"kNN method execution time for $\sqrt{k}$ neighbours")
@@ -130,11 +141,11 @@ def plot_benchmark_results(results: Dict[int, Dict[str, float]], k: Optional[int
         plt.savefig(f"./img/kNN_benchmarks_{k}_neighbours.png")
 
 
-def run_benchmarks(filename: str, sample_sizes: List[int], k: Optional[int] = None) -> Dict[int, Dict[str, float]]:
+def run_benchmarks(filename: str, sample_sizes: List[int], k: Optional[int] = None, n_runs: int = 1) -> Dict[int, Dict[str, Tuple[float, float]]]:
     results = {}
     for sample_size in sample_sizes:
         data = prepare_file(filename, sample_size)
-        benchmark_times = benchmark_kNN_methods(data, k=k)
+        benchmark_times = benchmark_kNN_methods(data, k=k, n_runs=n_runs)
         results[sample_size] = benchmark_times
         plot_benchmark_results_bar(benchmark_times, sample_size, k)
     plot_benchmark_results(results, k)
@@ -142,8 +153,8 @@ def run_benchmarks(filename: str, sample_sizes: List[int], k: Optional[int] = No
 
 
 if __name__ == "__main__":
-    results = run_benchmarks("../datasets/error_logs_test.csv", [1000, 5000, 10000, 20000, 40000], k=None)
+    results = run_benchmarks("../datasets/error_logs_test.csv", [1000, 5000, 10000, 20000, 40000], k=None, n_runs=5)
     for sample_size, benchmark_times in results.items():
         print(f"{sample_size} samples:")
         for algo_name, algo_time in benchmark_times.items():
-            print(f"\t{algo_name}: {algo_time:.4} s")
+            print(f"\t{algo_name}: {algo_time[0]:.4} ± {algo_time[1]:.4} s")
